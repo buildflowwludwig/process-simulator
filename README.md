@@ -1,27 +1,42 @@
 # Process Simulator
-A tool that helps businesses find gaps in their process flows before they cost time and money.
+
+A scenario-testing tool that checks whether a set of process flows still holds up when something unexpected happens, and turns the results into prioritised requirements.
+
+**▶ Try it live:** [buildflowwludwig.github.io/process-simulator](https://buildflowwludwig.github.io/process-simulator/) (in Swedish)
+
+Built for a project with **Svensk Scen**, where our group mapped the flows for three roles: **visitor**, **organiser** and **Svensk Scen** itself.
 
 ## The problem
-Many small and mid-sized companies have processes that have grown over time without ever being mapped. Gaps, bottlenecks and double work stay invisible until something breaks: a delivery is late, a customer is dropped between two teams, or the same work is done twice.
+A process flow drawn on a whiteboard almost always looks complete, because it is checked against the requirements the team already had in mind. The gaps show up later, when a real situation doesn't follow the happy path. We needed a way to test the flows against reality before using them to compare solution alternatives.
 
-## Target customer
-- **Users:** operations managers and process owners who need to see how work actually flows
-- **Buyers:** companies that want to improve their processes without a large consulting engagement, and consultants who need a faster way to map a client's flows
+## What the tool does
+- **71 scenarios** of things that can go wrong or deviate (60 against version 1 of the flows, 11 against version 2)
+- The group runs each scenario together: read it out loud, follow the flow step by step and find where it stops
+- Every scenario has a prepared **outcome**:
+  - **Confirmation:** the flow holds all the way, so the requirement is captured correctly
+  - **Ambiguity:** the flow holds, but something isn't decided, so the requirement needs to be sharpened
+  - **Gap:** the flow ends, so a need is missing from the requirements
+- A **summary** and an exportable **log** of every run
 
-## Value proposition
-Make a process visible, simulate it and see where it breaks, without hiring a consultant.
+## The thinking behind it
+**Frequency matters, not just the number of gaps.** Each scenario is tagged with how often it is expected to happen. A flow that breaks on something weekly is more serious than one that breaks once a year, so the summary weighs each outcome against frequency.
 
-## Business model (hypothesis)
-- SaaS subscription for companies, or a per-analysis price for smaller customers
-- A version for consultants who use the tool in their own client work
-- Reaching customers through operations and logistics networks, and through consultants as a channel
+**Outcomes become prioritised requirements (MoSCoW):**
 
-## How I approached it
-1. **Problem:** draws on my own experience of process and logistics flows at Quadient, where I was part of the project group merging the company's Nordic warehouses into one.
-2. **MVP scope:** focus on one thing: mapping a flow and showing where it breaks. Integrations and advanced analytics were deliberately left out.
-3. **Built** a first working version to test the idea.
+| Priority | When |
+|---|---|
+| Must have | The flow ends on something that happens often or sometimes |
+| Should have | The flow ends on something rare, or is unclear on something frequent |
+| Could have | The flow is unclear on something less frequent |
 
-## Next steps
-- Validate with real users in operations and logistics
-- Test pricing and which customer segment gets the most value
-- Prioritise features based on feedback
+Prioritisation then comes out of the validation instead of gut feeling, and it can be explained to the client.
+
+**Requirements, not pictures.** The flows are solution-neutral. Every step places a requirement on the solution, and those requirements are what the alternatives are compared against. New requirements found in testing are often the ones that separate the alternatives.
+
+**Honest about uncertainty.** The flows are built on our needs analysis, so they mix facts and assumptions. Frequencies are our estimates, responses are simulated, and the tool doesn't replace letting someone outside the group walk through the flows. The tool says this explicitly so the conclusions aren't oversold.
+
+## Documentation built in
+For every scenario we save the test task, what we observed (not what we thought), and the improvement made or the confirmation. Flows are saved both before and after the changes. That difference is what shows the validation was worth doing.
+
+## Tech
+A single self-contained HTML file (HTML, CSS, JavaScript) with no dependencies or backend. Built with AI-assisted development (Claude).

@@ -1,0 +1,1239 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Process-Simulator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400..700;1,400..700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0B1030;
+  --panel:#171F44;
+  --panel-2:#1F2855;
+  --panel-3:#273163;
+  --line:#2E3A6E;
+  --line-soft:#263060;
+  --ink:#EDF3FF;
+  --ink-2:#B6C3E6;
+  --muted:#7B88B2;
+  --acc:#74FFED;
+  --acc-soft:rgba(116,255,237,.09);
+  --acc-line:rgba(116,255,237,.32);
+  --pass:#4BE08A;
+  --warn:#FFC24D;
+  --stop:#FF6B85;
+  --r:14px;
+  --f:"Instrument Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+#glow{position:fixed;top:0;left:0;width:620px;height:620px;margin:-310px 0 0 -310px;
+  pointer-events:none;z-index:0;opacity:0;transition:opacity .5s;
+  background:radial-gradient(circle closest-side,
+    rgba(116,255,237,.085) 0%,
+    rgba(116,255,237,.045) 38%,
+    rgba(116,255,237,0) 72%);
+  will-change:transform}
+#glow.live{opacity:1}
+.shell,.drawer,.scrim{position:relative;z-index:1}
+.drawer{z-index:50}.scrim{z-index:40}
+@media (hover:none){#glow{display:none}}
+body{
+  margin:0;background:var(--bg);color:var(--ink);font-family:var(--f);
+  font-size:15px;line-height:1.55;
+  -webkit-font-smoothing:antialiased;
+  background-image:radial-gradient(1100px 620px at 50% -10%,rgba(116,255,237,.10),transparent 70%);
+  background-repeat:no-repeat;
+}
+.shell{max-width:980px;margin:0 auto;padding:30px 24px 70px}
+
+/* header */
+/* hero */
+.hero{display:flex;flex-direction:column;align-items:center;text-align:center;
+  padding:30px 0 34px;border-bottom:1px solid var(--line-soft);margin-bottom:30px}
+.hero-text{max-width:600px}
+h1{font-size:52px;line-height:1.02;font-weight:600;letter-spacing:-.035em;
+  margin:0 0 14px;color:var(--ink)}
+h1 .ja{color:var(--acc)}
+.hero-text p{margin:0 auto 20px;font-size:16.5px;line-height:1.55;color:var(--ink-2);
+  max-width:46ch}
+.hero-cta{display:flex;align-items:center;justify-content:center;gap:14px;
+  flex-wrap:wrap}
+.hero-cta .meta{color:var(--muted);font-size:13px}
+
+.orb{flex:0 0 auto;width:340px;height:340px;position:relative;margin-top:2px}
+.orb::before{content:"";position:absolute;inset:-14%;border-radius:50%;
+  transition:opacity .45s ease;opacity:1;
+  background:radial-gradient(circle closest-side,
+    rgba(116,255,237,.17) 0%, rgba(116,255,237,.06) 45%, transparent 72%)}
+.orb.hot::before{opacity:1.6}
+.orb canvas{position:relative;width:100%;height:100%;display:block}
+
+@media (max-width:820px){
+  .hero{padding:20px 0 28px}
+  .orb{width:min(300px,76vw);height:min(300px,76vw)}
+  h1{font-size:38px}
+}
+
+/* lägesväljare */
+.vsw{display:inline-flex;gap:2px;background:var(--panel);border:1px solid var(--line);
+  border-radius:10px;padding:3px;margin:22px 0 10px}
+.vsw button{appearance:none;border:0;background:transparent;color:var(--muted);
+  font:inherit;font-size:13px;font-weight:500;padding:6px 14px;border-radius:7px;
+  cursor:pointer;transition:background .14s,color .14s}
+.vsw button:hover{color:var(--acc);background:var(--acc-soft)}
+.vsw button.on{background:var(--acc);color:#07122B}
+.vsw button.on:hover{background:#9BFFF2;color:#07122B}
+
+/* segmented control */
+.seg{display:flex;gap:4px;background:var(--panel);border:1px solid var(--line);
+  border-radius:12px;padding:4px;margin:0 0 14px}
+.seg button{
+  flex:1;appearance:none;border:0;background:transparent;color:var(--ink-2);
+  font:inherit;font-weight:500;font-size:14px;padding:9px 12px;border-radius:9px;
+  cursor:pointer;display:flex;align-items:baseline;justify-content:center;gap:8px;
+  transition:background .14s,color .14s}
+.seg button:hover{color:var(--acc);background:var(--acc-soft)}
+.seg button.on{background:var(--panel-2);color:var(--acc);
+  box-shadow:inset 0 0 0 1px var(--acc-line)}
+.seg button.on:hover{background:var(--acc-soft)}
+.seg button em{font-style:normal;color:var(--muted);font-size:12.5px;
+  font-variant-numeric:tabular-nums}
+.seg button.on em{color:var(--ink-2)}
+
+/* tick strip */
+.ticks{display:flex;gap:3px;margin-bottom:26px;height:5px}
+.tick{flex:1;border-radius:2px;background:var(--line-soft);
+  transition:background .3s,transform .15s}
+.tick:hover{transform:scaleY(2)}
+.tick.pass{background:var(--pass)}
+.tick.warn{background:var(--warn)}
+.tick.stop{background:var(--stop)}
+.tick.now{box-shadow:0 0 0 1.5px var(--bg),0 0 0 3px currentColor}
+
+/* controls */
+.bar{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:20px}
+button.btn{appearance:none;font:inherit;font-size:14px;cursor:pointer;
+  border-radius:10px;border:1px solid var(--line);background:var(--panel);
+  color:var(--ink-2);padding:9px 15px;transition:.14s}
+button.btn:hover:not(:disabled){border-color:var(--acc-line);color:var(--acc);
+  background:var(--acc-soft)}
+button.btn:disabled{opacity:.35;cursor:not-allowed}
+button.solid{background:var(--acc);border-color:var(--acc);color:#07122B;font-weight:600}
+button.solid:hover:not(:disabled){background:#9BFFF2;border-color:#9BFFF2;color:#07122B}
+.kbd{margin-left:auto;color:var(--muted);font-size:12.5px}
+.kbd b{color:var(--ink-2);font-weight:500;border:1px solid var(--line);
+  border-radius:5px;padding:1px 6px;font-size:11.5px}
+
+/* card */
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);
+  padding:28px 30px 30px;transition:border-color .18s,background .18s}
+.card:hover{border-color:var(--acc-line);background:#1B2450}
+.empty{color:var(--muted);padding:56px 0;text-align:center}
+.head{display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+  padding-bottom:18px;border-bottom:1px solid var(--line-soft);margin-bottom:22px}
+.head .chip{margin-left:auto}
+.freq{font-size:12px;color:var(--muted);border:1px solid var(--line);
+  border-radius:999px;padding:3px 10px;white-space:nowrap}
+.freq.f-ofta{color:var(--ink-2);border-color:#3B4A85}
+.id{font-size:13px;color:var(--acc);opacity:.85;font-variant-numeric:tabular-nums;
+  letter-spacing:.01em;font-weight:500}
+.chip{font-size:12.5px;font-weight:600;padding:5px 12px;border-radius:999px;
+  border:1px solid currentColor;white-space:nowrap}
+.chip.pass{color:var(--pass)}
+.chip.warn{color:var(--warn)}
+.chip.stop{color:var(--stop)}
+.scen{font-size:23px;line-height:1.38;letter-spacing:-.015em;font-weight:400;
+  margin:0;max-width:40ch}
+
+/* pre-reveal */
+.prompt{margin-top:26px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.prompt span{color:var(--muted);font-size:13.5px}
+
+/* rail */
+.rail{margin:28px 0 0;list-style:none;padding:0}
+.rail li{position:relative;padding:0 0 0 34px;min-height:40px;display:flex;
+  align-items:center;gap:10px;font-size:14.5px;color:var(--ink-2)}
+.rail li .node{position:absolute;left:5px;top:14px;width:11px;height:11px;
+  border-radius:50%;background:var(--line);border:1px solid var(--line);
+  transition:background .2s,border-color .2s,box-shadow .2s}
+.rail li .wire{position:absolute;left:10px;top:25px;bottom:-15px;width:1px;
+  background:var(--line)}
+.rail li:last-child .wire{display:none}
+.rail li .num{color:var(--muted);font-variant-numeric:tabular-nums;width:14px;
+  flex:0 0 14px}
+.rail li .tag{margin-left:auto;font-size:12.5px;color:var(--muted)}
+.rail li{border-radius:8px;margin-left:-8px;padding-left:42px;
+  transition:background .15s}
+.rail li .node{left:13px}
+.rail li .wire{left:18px}
+.rail li.lit:hover{background:var(--acc-soft)}
+
+.rail li.q{opacity:0;transform:translateY(5px)}
+.rail li.lit{opacity:1;transform:none;transition:opacity .28s ease,transform .28s ease}
+.rail li.lit.ok .node{background:var(--pass);border-color:var(--pass)}
+.rail li.lit.ok{color:var(--ink)}
+.rail li.lit.halt-warn .node{background:var(--warn);border-color:var(--warn);
+  box-shadow:0 0 0 4px rgba(255,194,77,.18)}
+.rail li.lit.halt-warn{color:var(--ink)}
+.rail li.lit.halt-stop .node{background:var(--stop);border-color:var(--stop);
+  box-shadow:0 0 0 4px rgba(255,107,133,.18)}
+.rail li.lit.halt-stop{color:var(--ink)}
+.rail li.lit.dead{color:#5A6690}
+.rail li.lit.dead .node{background:transparent;border-color:#39447A}
+.rail li.dashed .wire{background:repeating-linear-gradient(to bottom,
+  var(--line) 0 3px,transparent 3px 7px)}
+.halt-label{color:inherit;font-size:12.5px;margin-left:auto}
+
+/* findings */
+.find{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:28px}
+.find section{background:var(--panel-2);border:1px solid var(--line-soft);
+  border-radius:11px;padding:16px 18px;transition:border-color .18s,background .18s}
+.find section:hover{border-color:var(--acc-line);background:var(--panel-3)}
+.find h3{margin:0 0 7px;font-size:12.5px;font-weight:600;color:var(--acc);
+  letter-spacing:.005em}
+.find p{margin:0;font-size:14.5px;line-height:1.55;color:var(--ink)}
+.find.q{opacity:0}
+.find.lit{opacity:1;transition:opacity .3s ease .1s}
+
+/* drawer */
+.scrim{position:fixed;inset:0;background:rgba(5,9,26,.62);opacity:0;
+  pointer-events:none;transition:opacity .2s;z-index:40}
+.scrim.on{opacity:1;pointer-events:auto}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(560px,100%);
+  background:var(--panel);border-left:1px solid var(--line);z-index:50;
+  transform:translateX(100%);transition:transform .26s cubic-bezier(.3,.7,.3,1);
+  display:flex;flex-direction:column}
+.drawer.on{transform:none}
+.dh{display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:20px 24px;border-bottom:1px solid var(--line)}
+.dh h2{margin:0;font-size:16px;font-weight:600;color:var(--acc)}
+.db{flex:1;overflow:auto;padding:6px 24px 20px}
+.df{padding:16px 24px;border-top:1px solid var(--line);display:flex;gap:9px;
+  justify-content:flex-end}
+.row{padding:16px 14px;margin:0 -14px;border-bottom:1px solid var(--line-soft);
+  border-radius:10px;transition:background .15s}
+.row:hover{background:var(--acc-soft)}
+.row:last-child{border-bottom:0}
+.rowtop{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.row .scn{margin:0 0 8px;font-size:14.5px;color:var(--ink)}
+.row .meta{margin:3px 0;font-size:13px;color:var(--muted);line-height:1.5}
+.row .meta b{color:var(--ink-2);font-weight:600}
+
+/* sammanställning */
+.sum-note{color:var(--muted);font-size:13px;margin:14px 0 18px;line-height:1.6}
+.sum-flow{border:1px solid var(--line-soft);border-radius:11px;padding:15px 17px;
+  margin-bottom:11px;background:var(--panel-2);transition:border-color .18s}
+.sum-flow:hover{border-color:var(--acc-line)}
+.sum-top{display:flex;align-items:baseline;gap:10px;margin-bottom:11px}
+.sum-top h3{margin:0;font-size:15px;font-weight:600;color:var(--ink)}
+.sum-top .run{color:var(--muted);font-size:12.5px;font-variant-numeric:tabular-nums}
+.sum-top .load{margin-left:auto;font-size:13px;color:var(--acc);font-weight:600;
+  font-variant-numeric:tabular-nums}
+.stack{display:flex;height:7px;border-radius:4px;overflow:hidden;
+  background:var(--line-soft);margin-bottom:9px}
+.stack i{display:block}
+.stack i.pass{background:var(--pass)} .stack i.warn{background:var(--warn)}
+.stack i.stop{background:var(--stop)}
+.legend{display:flex;gap:14px;font-size:12.5px;color:var(--muted);flex-wrap:wrap}
+.legend b{font-weight:600;font-variant-numeric:tabular-nums}
+.legend .lp b{color:var(--pass)} .legend .lw b{color:var(--warn)}
+.legend .ls b{color:var(--stop)}
+.prio-h{display:flex;align-items:baseline;gap:9px;margin:24px 0 9px}
+.prio-h h3{margin:0;font-size:14px;font-weight:600}
+.prio-h.must h3{color:var(--stop)} .prio-h.should h3{color:var(--warn)}
+.prio-h.could h3{color:var(--acc)}
+.prio-h span{color:var(--muted);font-size:12.5px}
+.req{padding:10px 13px;border-left:2px solid var(--line);margin-bottom:7px;
+  transition:border-color .15s,background .15s;border-radius:0 8px 8px 0}
+.req:hover{background:var(--acc-soft)}
+.req.must{border-left-color:var(--stop)}
+.req.should{border-left-color:var(--warn)}
+.req.could{border-left-color:var(--acc)}
+.req p{margin:0;font-size:13.5px;color:var(--ink-2);line-height:1.5}
+.req .src{display:block;margin-top:4px;font-size:12px;color:var(--muted)}
+
+/* lathund */
+.guide{margin-top:30px;border:1px solid var(--line);border-radius:var(--r);
+  background:var(--panel);overflow:hidden;transition:border-color .18s}
+.guide:hover{border-color:var(--acc-line)}
+.guide summary{list-style:none;cursor:pointer;padding:16px 22px;
+  display:flex;align-items:center;gap:10px;font-size:14.5px;font-weight:500;
+  color:var(--acc);transition:background .15s}
+.guide summary::-webkit-details-marker{display:none}
+.guide summary:hover{background:var(--acc-soft)}
+.guide summary .sign{width:16px;flex:0 0 16px;font-size:17px;line-height:1;
+  transition:transform .2s}
+.guide[open] summary .sign{transform:rotate(45deg)}
+.guide summary .hint{margin-left:auto;color:var(--muted);font-size:12.5px;
+  font-weight:400}
+.gbody{padding:4px 22px 24px;border-top:1px solid var(--line-soft)}
+.gbody h4{margin:22px 0 8px;font-size:13.5px;font-weight:600;color:var(--ink)}
+.gbody h4:first-child{margin-top:18px}
+.gbody p{margin:0 0 8px;font-size:14px;color:var(--ink-2);max-width:70ch;
+  line-height:1.6}
+.gbody ol,.gbody ul{margin:0;padding-left:18px;color:var(--ink-2);font-size:14px;
+  line-height:1.6;max-width:70ch}
+.gbody li{margin-bottom:5px}
+.verdicts{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:12px 0 4px}
+.verdicts div{border:1px solid var(--line-soft);border-radius:10px;
+  padding:13px 15px;background:var(--panel-2);transition:border-color .18s}
+.verdicts div:hover{border-color:var(--acc-line);background:var(--panel-3)}
+.verdicts strong{display:block;font-size:13px;margin-bottom:5px}
+.verdicts p{margin:0;font-size:13px;color:var(--muted);line-height:1.5}
+.v-pass strong{color:var(--pass)} .v-warn strong{color:var(--warn)}
+.v-stop strong{color:var(--stop)}
+@media (max-width:640px){.verdicts{grid-template-columns:1fr}}
+
+footer{margin-top:26px;padding-top:18px;border-top:1px solid var(--line-soft);
+  color:var(--muted);font-size:12.5px;line-height:1.65;max-width:72ch}
+
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px;border-radius:6px}
+@media (max-width:640px){
+  .find{grid-template-columns:1fr}
+  .scen{font-size:20px}
+  .card{padding:22px 20px 24px}
+}
+@media (prefers-reduced-motion:reduce){
+  .rail li.q{opacity:1;transform:none}
+  .find.q{opacity:1}
+  *{transition-duration:.01ms !important}
+}
+</style>
+</head>
+<body>
+<div id="glow" aria-hidden="true"></div>
+<div class="shell">
+
+  <section class="hero">
+    <div class="hero-text">
+      <h1>Process-<span class="ja">Simulator</span></h1>
+      <p>Prövar om Svensk Scens flöden håller när något oväntat händer.
+      60 scenarier mot v1, 11 mot v2.</p>
+      <div class="hero-cta">
+        <button class="btn solid" id="start">Starta</button>
+        <span class="meta">Besökare · Arrangör · Svensk Scen</span>
+      </div>
+    </div>
+
+    <div class="orb" aria-hidden="true"><canvas></canvas></div>
+  </section>
+
+  <div class="vsw" id="vsw"></div>
+  <div class="seg" id="seg"></div>
+  <div class="ticks" id="ticks"></div>
+
+  <div class="bar">
+    <button class="btn solid" id="act">Kör scenario</button>
+    <button class="btn" id="runall">Kör alla kvarvarande</button>
+    <button class="btn" id="sumbtn">Sammanställning</button>
+    <button class="btn" id="logbtn">Logg</button>
+    <button class="btn" id="reset">Nollställ</button>
+    <span class="kbd"><b>mellanslag</b> kör och visar</span>
+  </div>
+
+  <div id="stage"></div>
+
+  <details class="guide">
+    <summary>
+      <span class="sign">+</span>
+      Lathund
+      <span class="hint">vad testet är till för och vad vi gör med utfallen</span>
+    </summary>
+    <div class="gbody">
+
+      <h4>Vad det här är</h4>
+      <p>En användarvalidering av våra processflöden. Vi prövar om flödena håller
+      när något oväntat händer, i stället för att bara kontrollera dem mot våra
+      egna krav. Uppgiften kräver att ett besökarflöde och ett arrangörsflöde
+      prövas, och att vi sparar testuppgift, observation och förbättring eller
+      bekräftelse.</p>
+      <p>Flödena är byggda på vår behovsbild och är alltså en kombination av
+      fakta och antaganden. Det påverkar hur säkra slutsatserna från testet är,
+      och ska framgå när vi redovisar dem.</p>
+
+      <h4>Så kör vi ett scenario</h4>
+      <ol>
+        <li>Läs scenariot högt för gruppen.</li>
+        <li>Följ flödet steg för steg tillsammans. Var tar det stopp?</li>
+        <li>Visa utfallet och jämför med vad vi kom fram till.</li>
+        <li>Är vi oense med kortet gäller vår bedömning. Skriv ner den.</li>
+      </ol>
+
+      <h4>Vad utfallen betyder</h4>
+      <div class="verdicts">
+        <div class="v-pass"><strong>Bekräftelse</strong>
+          <p>Flödet bär hela vägen. Stöd för att kravet är rätt fångat.</p></div>
+        <div class="v-warn"><strong>Otydlighet</strong>
+          <p>Flödet bär, men något är inte bestämt. Kravet behöver preciseras.</p></div>
+        <div class="v-stop"><strong>Lucka</strong>
+          <p>Flödet tar slut. Ett behov saknas i underlaget.</p></div>
+      </div>
+
+      <h4>Vad vi gör med dem</h4>
+      <p>Varje utfall ska leda vidare, annars har testet inte gjort nytta:</p>
+      <ul>
+        <li><strong>Lucka</strong> — komplettera flödet, formulera kravet som
+        uppstår, och märk det som vårt antagande. Kravet går sedan in i
+        jämförelsen av alternativen.</li>
+        <li><strong>Otydlighet</strong> — skärp formuleringen av kravet så att
+        det går att kontrollera. Ett krav utan mätmetod är värdelöst.</li>
+        <li><strong>Bekräftelse</strong> — behåll kravet och använd det som stöd
+        när vi motiverar rekommendationen.</li>
+      </ul>
+
+      <h4>Varför frekvens spelar roll</h4>
+      <p>Varje scenario är märkt med hur ofta det bedöms inträffa. Ett flöde som
+      brister på något som händer varje vecka är allvarligare än ett som brister
+      på något som händer en gång om året — därför räcker det inte att räkna
+      antalet luckor. Tyngden i sammanställningen väger utfallet mot frekvensen.</p>
+      <p>Frekvenserna är våra antaganden. Vi har ingen data på hur ofta något
+      inträffar hos Svensk Scen, och det ska framgå när vi redovisar.</p>
+
+      <h4>Så blir utfallen krav med prioritet</h4>
+      <ul>
+        <li><strong>Must have</strong> — flödet tar slut på något som inträffar
+        ofta eller ibland.</li>
+        <li><strong>Should have</strong> — tar slut på något sällsynt, eller är
+        otydligt på något som inträffar ofta.</li>
+        <li><strong>Could have</strong> — otydligt på något som inträffar mer
+        sällan.</li>
+      </ul>
+      <p>Då kommer prioriteringen ur valideringen i stället för ur magkänsla,
+      och den går att motivera för beställaren.</p>
+
+      <h4>Kopplingen till lösningsalternativen</h4>
+      <p>Flödena är lösningsneutrala. Varje steg ställer ett krav på lösningen,
+      och det är de kraven vi mäter alternativen mot — inte bilden i sig. När
+      testet är klart har vi en kravlista som ger behovstäckningen i
+      alternativjämförelsen, och de krav som tillkom här är ofta de som skiljer
+      alternativen åt.</p>
+
+      <h4>Att dokumentera</h4>
+      <ul>
+        <li>Testuppgiften, alltså scenariot vi körde.</li>
+        <li>Vad vi observerade, inte vad vi tyckte.</li>
+        <li>Förbättringen vi gjorde, eller att flödet bekräftades.</li>
+        <li>Att responsen är simulerad.</li>
+      </ul>
+      <p>Spara flödet både före och efter ändringarna. Det är den sparade
+      skillnaden som visar att valideringen gav något.</p>
+
+    </div>
+  </details>
+
+  <footer>
+    Utfallen är förberedda bedömningar av flödena, inte något programmet räknar
+    fram. Testet ersätter inte att låta någon utanför gruppen gå igenom flödet.
+    All respons här räknas som simulerad.
+  </footer>
+</div>
+
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" aria-hidden="true">
+  <div class="dh">
+    <h2 id="dtitle">Logg</h2>
+    <button class="btn" id="dclose">Stäng</button>
+  </div>
+  <div class="db" id="dbody"></div>
+  <div class="df">
+    <button class="btn" id="copy">Kopiera</button>
+    <button class="btn solid" id="dl">Ladda ner</button>
+  </div>
+</aside>
+
+<script>
+const FLOWS = {
+  besokare: {
+    name: "Besökare",
+    steps: ["Hittar eventet","Ser eventinformationen","Anmäler sig via tjänsten",
+      "Får bekräftelse på anmälan","Får uppdateringar om eventet",
+      "Kan avboka sig från eventet","Följer arrangören"],
+    scenarios: [
+      {t:"Besökaren hittar ett event via en arrangör hen redan följer och anmäler sig.",stop:null,o:"pass",
+       w:"Flödet bär hela vägen. Alla steg har en tydlig fortsättning.",
+       p:"Bekräftar behoven om att hitta event, lita på informationen, anmäla sig och få bekräftelse."},
+      {t:"Besökaren ser en starttid i tjänsten och en annan på en affisch i butiken.",stop:2,o:"stop",
+       w:"Flödet förutsätter att all information hämtas från samma källa. Tryckt material som redan distribuerats kan inte uppdateras.",
+       p:"Krav: det ska framgå när informationen senast uppdaterades, och tryckt material behöver en egen rutin."},
+      {t:"Besökaren anmäler sig men är osäker på om anmälan gick igenom.",stop:4,o:"warn",
+       w:"Steg 4 täcker bekräftelsen, men flödet säger inget om hur snabbt den ska komma eller vad besökaren gör om den uteblir.",
+       p:"Krav: bekräftelsen ska komma direkt, och det ska finnas en väg att kontrollera sin anmälan."},
+      {t:"Eventet flyttas en vecka fram. Besökaren undrar om anmälan följer med.",stop:5,o:"stop",
+       w:"Besökaren får besked om ändringen, men det framgår inte om anmälan gäller det nya datumet eller måste göras om.",
+       p:"Krav: befintliga anmälningar ska kunna flyttas vid ändrat datum."},
+      {t:"Besökaren vill avboka sig dagen före eventet.",stop:6,o:"warn",
+       w:"Steg 6 finns, men flödet säger inget om det finns en sista tidpunkt för avbokning.",
+       p:"Krav: eventuell avbokningsgräns ska framgå för besökaren."},
+      {t:"Eventet ställs in helt.",stop:5,o:"stop",
+       w:"Flödet beskriver uppdateringar om eventet, men inte vad som händer med anmälan när eventet upphör att existera.",
+       p:"Krav: inställt event ska vara en egen ärendetyp med besked till anmälda."},
+      {t:"Besökaren vill anmäla sig själv och en vän samtidigt.",stop:3,o:"stop",
+       w:"Flödet utgår från en anmälan per person. Ingen väg finns för att anmäla fler.",
+       p:"Behov som inte fångats: anmälan för flera personer."},
+      {t:"Eventet är fullbokat när besökaren försöker anmäla sig.",stop:3,o:"stop",
+       w:"Flödet har ingen hantering av fullbokning. Steg 3 förutsätter att anmälan alltid går igenom.",
+       p:"Krav: fullbokning ska hanteras, och eventuell väntelista behöver beslutas."},
+      {t:"Besökaren byter mejladress efter att ha anmält sig.",stop:5,o:"stop",
+       w:"Uppdateringar skickas till den adress som angavs vid anmälan. Flödet har ingen väg för besökaren att ändra sina uppgifter.",
+       p:"Krav: besökaren ska kunna uppdatera sina kontaktuppgifter."},
+      {t:"Besökaren vill se vilka event hen är anmäld till.",stop:4,o:"stop",
+       w:"Flödet följer ett event i taget. Ingen samlad översikt för besökaren finns beskriven.",
+       p:"Behov som inte fångats: besökaren behöver överblick över sina anmälningar."},
+      {t:"Besökaren anmäler sig av misstag till två event samma kväll.",stop:3,o:"warn",
+       w:"Flödet hindrar det inte, och det är troligen rätt. Men ingen varning eller överblick finns som skulle få besökaren att upptäcka krocken.",
+       p:"Hänger ihop med behovet av översikt över egna anmälningar."},
+      {t:"Besökaren vill veta om eventet har åldersgräns och är tillgänglighetsanpassat.",stop:2,o:"stop",
+       w:"Steg 2 nämner tid och plats. Vilken information ett event ska innehålla är inte bestämt.",
+       p:"Krav: definiera vilka uppgifter ett event alltid ska innehålla."},
+      {t:"Lokalen ändras men tiden är densamma.",stop:null,o:"pass",
+       w:"Flödet bär. En ändring är en ändring oavsett vilket fält som berörs, och besked går ut i steg 5.",
+       p:"Bekräftar behovet av uppdateringar om eventet."},
+      {t:"Besökaren vill sluta följa en arrangör.",stop:7,o:"warn",
+       w:"Steg 7 beskriver att följa, inte att sluta följa. Troligen enkelt att lösa, men saknas i flödet.",
+       p:"Krav: besökaren ska kunna avsluta en bevakning."},
+      {t:"Besökaren får ingen bekräftelse eftersom fel mejladress angavs.",stop:4,o:"stop",
+       w:"Flödet förutsätter att bekräftelsen når fram. Ingen hantering av misslyckad leverans finns.",
+       p:"Krav: utebliven leverans ska upptäckas och gå att åtgärda."},
+      {t:"Besökaren anmäler sig till ett event som ligger ett halvår fram.",stop:5,o:"warn",
+       w:"Flödet bär, men lång tid mellan anmälan och event ökar risken att kontaktuppgifter hunnit bli inaktuella.",
+       p:"Hänger ihop med behovet av att kunna uppdatera sina uppgifter."},
+      {t:"Besökaren hittar eventet via en söktjänst utanför plattformen.",stop:null,o:"pass",
+       w:"Flödet bär även när besökaren kommer utifrån. Hen landar på eventsidan och fortsätter från steg 2, där den gällande uppgiften visas.",
+       p:"Bekräftar att ansvarsfördelningen är det som bär: när bara en eller två parter får bekräfta och ändra eventinformation finns det mindre utrymme för misstag, oavsett vilken väg besökaren kommer in."},
+      {t:"Besökaren avbokar sig och ångrar sig sedan.",stop:6,o:"stop",
+       w:"Flödet har ingen väg tillbaka från steg 6 till steg 3.",
+       p:"Krav: avbokning ska kunna följas av ny anmälan, om plats finns."},
+      {t:"Besökaren vill veta vem hen kontaktar vid frågor om eventet.",stop:2,o:"stop",
+       w:"Flödet beskriver information som visas, men ingen kontaktväg för besökaren.",
+       p:"Krav: en kontaktpunkt ska framgå, och det ska vara bestämt vem som svarar."},
+      {t:"Eventet närmar sig och besökaren vill ha en påminnelse.",stop:5,o:"stop",
+       w:"Steg 5 handlar om besked vid ändringar, inte om planerade utskick.",
+       p:"Behov som inte fångats: påminnelse inför event."}
+    ]
+  },
+  arrangor: {
+    name: "Arrangör",
+    steps: ["Kommer överens med artisten","Lämnar eventinformationen i en kanal",
+      "Får besked att informationen tagits emot","Utpekad ansvarig granskar och godkänner",
+      "Informationen blir den som gäller","Får besked att den publicerats",
+      "Ändrar informationen på ett ställe","Ser den aktuella anmälningslistan"],
+    scenarios: [
+      {t:"Arrangören har kommit överens med en artist och lämnar in ett nytt event.",stop:null,o:"pass",
+       w:"Flödet bär hela vägen. Standardfallet fungerar som avsett.",
+       p:"Bekräftar behoven om en tydlig kanal, återkoppling och en gemensam informationskälla."},
+      {t:"Artisten blir sjuk. Eventet skjuts upp en vecka.",stop:null,o:"stop",
+       w:"Flödet bär formellt, men det framgår inte vad som händer med dem som redan anmält sig.",
+       p:"Krav: befintliga anmälningar ska kunna flyttas vid ändrat datum."},
+      {t:"Eventet måste ställas in helt.",stop:2,o:"stop",
+       w:"Steg 2 är byggt för att lämna eller ändra information. Att ta bort ett event är varken det ena eller det andra.",
+       p:"Krav: inställt event ska vara en egen ärendetyp."},
+      {t:"Arrangören har lämnat in information men hör inget på tre dagar.",stop:4,o:"stop",
+       w:"Flödet säger att en utpekad ansvarig granskar, men inte inom vilken tid eller vad som händer om svar uteblir.",
+       p:"Krav: svarstid och eskaleringsväg behöver bestämmas."},
+      {t:"Den utpekade ansvariga begär ändring av den föreslagna tiden.",stop:4,o:"warn",
+       w:"Steg 4 nämner att godkännande kan utebli, men flödet ritar ingen återgång till steg 2.",
+       p:"Flödet behöver en synlig återgång när ändring begärs."},
+      {t:"Arrangören upptäcker att fel lokal publicerats.",stop:null,o:"pass",
+       w:"Flödet bär. Ändringen går via steg 7 och samma väg som den ursprungliga uppgiften.",
+       p:"Bekräftar behovet av att ändra på ett ställe."},
+      {t:"Arrangören vill se vilka som anmält sig till sitt event.",stop:null,o:"pass",
+       w:"Steg 8 täcker det, och listan är den som gäller.",
+       p:"Bekräftar behovet av att veta vilken lista som är aktuell."},
+      {t:"Arrangören vill lägga till en andra föreställning samma kväll.",stop:2,o:"warn",
+       w:"Det framgår inte om detta är ett nytt event eller en ändring av det befintliga. Vägen in blir olika beroende på svaret.",
+       p:"Krav: definiera vad som utgör ett event."},
+      {t:"Två arrangörer lämnar in samma event av misstag.",stop:4,o:"stop",
+       w:"Flödet har ingen kontroll mot dubbletter. Båda förslagen går vidare till granskning var för sig.",
+       p:"Krav: dubbletter ska kunna upptäckas vid granskning."},
+      {t:"Arrangören behöver ändra beskrivningen men inte tiden.",stop:7,o:"warn",
+       w:"Flödet skickar alla ändringar samma väg. Det framgår inte om varje ändring kräver godkännande, oavsett hur liten.",
+       p:"Krav: bestäm vilka ändringar som kräver godkännande."},
+      {t:"Arrangören vill sätta ett tak för antalet anmälda.",stop:2,o:"stop",
+       w:"Flödet hanterar information om eventet, inte villkor för anmälan.",
+       p:"Behov som inte fångats: arrangören behöver kunna styra antalet platser."},
+      {t:"Artisten vill ha sitt namn skrivet på ett särskilt sätt.",stop:4,o:"warn",
+       w:"Vid granskning kan formuleringar komma att ändras. Det framgår inte vem som äger texten.",
+       p:"Krav: bestäm vad granskningen får ändra och vad som är arrangörens."},
+      {t:"Arrangören vill veta vem som godkände en viss ändring och när.",stop:5,o:"stop",
+       w:"Flödet skapar en gällande version men beskriver ingen historik över tidigare versioner och beslut.",
+       p:"Krav: ändringar ska gå att följa i efterhand."},
+      {t:"Arrangören lämnar in ett event med två dagars varsel.",stop:4,o:"stop",
+       w:"Granskningssteget har ingen snabbväg. Flödet behandlar alla ärenden lika.",
+       p:"Krav: brådskande ärenden behöver en bestämd hantering."},
+      {t:"Arrangören vill exportera anmälningslistan inför eventet.",stop:8,o:"warn",
+       w:"Steg 8 säger att arrangören ser listan, inte att den går att få ut i annat format.",
+       p:"Krav: bestäm om listan ska gå att exportera, och i så fall hur."},
+      {t:"Arrangören behöver nå alla anmälda med praktisk information om parkering.",stop:7,o:"stop",
+       w:"Flödet skickar besked vid ändringar. Ingen väg finns för allmän information till anmälda.",
+       p:"Behov som inte fångats: arrangören behöver kunna kommunicera med sina anmälda."},
+      {t:"En ny medarbetare hos arrangören ska också kunna lämna in event.",stop:2,o:"stop",
+       w:"Flödet beskriver arrangören som en enhet. Hur flera personer hos samma arrangör hanteras framgår inte.",
+       p:"Krav: behörighet ska kunna ges till flera personer per arrangör."},
+      {t:"Arrangören vill kontrollera att informationen publicerats i alla kanaler.",stop:null,o:"pass",
+       w:"Steg 6 täcker det — återkopplingen anger var informationen publicerats.",
+       p:"Bekräftar behovet av återkoppling när information publicerats."},
+      {t:"Eventet flyttas till en annan ort.",stop:null,o:"pass",
+       w:"Flödet bär. Orten är en uppgift bland andra och ändras via steg 7.",
+       p:"Bekräftar behovet av att ändra på ett ställe."},
+      {t:"Arrangören vill ta bort ett event som ännu inte publicerats.",stop:3,o:"stop",
+       w:"Flödet har ingen väg för att dra tillbaka ett inlämnat förslag innan det godkänts.",
+       p:"Krav: inlämnade förslag ska kunna återkallas."}
+    ]
+  },
+  svenskscen: {
+    name: "Svensk Scen",
+    steps: ["Förslag kommer in till plattformen","Event Admin granskar och godkänner",
+      "Gällande version skapas","Delegerad ADMIN publicerar i sin kanal",
+      "Informationen är publicerad","Besökaren ser samma uppgift"],
+    scenarios: [
+      {t:"Ett förslag kommer in från en arrangör och går igenom granskning och publicering.",stop:null,o:"pass",
+       w:"Kedjan bär hela vägen och ansvaret är tydligt i varje led.",
+       p:"Bekräftar behoven om tydligt ansvar och en gemensam källa."},
+      {t:"Event Admin är sjuk en vecka.",stop:2,o:"stop",
+       w:"Hela kedjan passerar en enda roll. Ingen ersättare är utpekad.",
+       p:"Krav: ställföreträdare för godkännande behöver bestämmas."},
+      {t:"Två ändringar på samma event kommer in samma dag.",stop:3,o:"stop",
+       w:"Det framgår inte vilken ändring som blir den gällande versionen om båda godkänns.",
+       p:"Krav: ordningen mellan konkurrerande ändringar behöver bestämmas."},
+      {t:"Kommunikation behöver publicera innan Event Admin hunnit godkänna.",stop:4,o:"stop",
+       w:"Flödet tillåter bara publicering från en godkänd gällande version. Ingen undantagsväg finns beskriven.",
+       p:"Krav: bestäm om brådskande publicering ska vara möjlig och vem som får besluta."},
+      {t:"Ett publicerat event visar fel tid på webbplatsen.",stop:5,o:"warn",
+       w:"Den gällande versionen är rätt, men publiceringen har inte slagit igenom. Flödet säger inte vem som upptäcker det.",
+       p:"Krav: publicerad information ska kunna kontrolleras mot den gällande versionen."},
+      {t:"En arrangör ska inte längre ha behörighet att lämna in event.",stop:1,o:"stop",
+       w:"Flödet beskriver att arrangörer har skrivrättighet, men inte hur behörighet ges eller tas bort.",
+       p:"Krav: behörighetshantering behöver en egen rutin och en ansvarig."},
+      {t:"Delegerad ADMIN löper ut mitt under ett pågående uppdrag.",stop:4,o:"stop",
+       w:"Publiceringen avbryts mitt i. Flödet säger inget om förlängning eller överlämning.",
+       p:"Krav: delegering ska kunna förlängas, och utgång ska varslas i förväg."},
+      {t:"Utvecklarna behöver ändra i plattformen samtidigt som en publicering pågår.",stop:4,o:"warn",
+       w:"Flödet beskriver ingen ordning mellan tekniskt arbete och publicering.",
+       p:"Krav: bestäm hur tekniskt arbete och löpande publicering samordnas."},
+      {t:"Intern IT upptäcker att webbplatsen inte hämtat den senaste versionen.",stop:4,o:"stop",
+       w:"Flödet förutsätter att publiceringen lyckas. Ingen kontroll av att hämtningen gått igenom finns.",
+       p:"Krav: misslyckad publicering ska upptäckas automatiskt."},
+      {t:"Ett event ska ställas in. Frågan är vem som beslutar.",stop:2,o:"warn",
+       w:"Event Admin godkänner förslag från arrangörer. Att ställa in är inte ett förslag, och mandatet framgår inte.",
+       p:"Krav: bestäm vem som beslutar om inställda event."},
+      {t:"De 60 nya arrangörerna ska läggas in i plattformen.",stop:1,o:"warn",
+       w:"Flödet är byggt för ett ärende i taget. Hur en större mängd hanteras framgår inte.",
+       p:"Krav: bedöm om flödet håller vid ökad volym — kopplar till effektmålet om att klara fler arrangemang."},
+      {t:"En arrangör begär att få sina uppgifter borttagna.",stop:1,o:"stop",
+       w:"Flödet hanterar eventinformation, inte personuppgifter om arrangörer och besökare.",
+       p:"Krav: hantering av personuppgifter behöver beskrivas separat."},
+      {t:"Event Admin godkänner ett förslag som senare visar sig vara felaktigt.",stop:3,o:"stop",
+       w:"Den felaktiga uppgiften har blivit gällande version och publicerats. Ingen väg tillbaka finns beskriven.",
+       p:"Krav: felaktig gällande version ska kunna rättas och tidigare version återställas."},
+      {t:"En besökare hör av sig om ett event som inte finns i plattformen.",stop:1,o:"stop",
+       w:"Flödet har ingen ingång för frågor från besökare.",
+       p:"Krav: bestäm vem som tar emot och hanterar besökarfrågor."},
+      {t:"Ledningen vill ha en sammanställning över alla kommande event.",stop:3,o:"warn",
+       w:"Den gällande versionen finns per event, men ingen samlad överblick är beskriven.",
+       p:"Kopplar till effektmålet om att ledningen ska få en samlad bild."},
+      {t:"En ändring behöver gå ut samma dag.",stop:2,o:"stop",
+       w:"Flödet behandlar alla ärenden lika och har ingen prioriteringsväg.",
+       p:"Krav: brådskande ändringar behöver en bestämd hantering."},
+      {t:"Kommunikation och Intern IT publicerar var sin version av samma event.",stop:null,o:"pass",
+       w:"Det ska inte kunna inträffa i det här flödet — båda hämtar från samma gällande version.",
+       p:"Bekräftar att en gemensam källa löser det ursprungliga problemet med motstridig information."},
+      {t:"Ett event ska synas i sociala medier men inte på webbplatsen.",stop:4,o:"stop",
+       w:"Flödet publicerar till alla kanaler från samma källa. Ingen styrning per kanal finns.",
+       p:"Krav: bestäm om publicering ska kunna styras per kanal."},
+      {t:"Stagedivers plattform ligger nere några timmar.",stop:1,o:"stop",
+       w:"Hela flödet börjar i plattformen. Ingen reservväg finns beskriven.",
+       p:"Risk: ett beroende till en enda ingång. Hör hemma i riskanalysen."},
+      {t:"Svensk Scen ska själva lägga in ett event, inte en arrangör.",stop:1,o:"warn",
+       w:"Flödet utgår från att arrangören är avsändare. Egna event har ingen beskriven väg in.",
+       p:"Krav: bestäm hur Svensk Scens egna arrangemang hanteras."}
+    ]
+  },
+
+  besokare_v2: {
+    name: "Besökare", ver: "v2",
+    steps: ["Hittar eventet","Ser eventinformationen","Hittar kontaktvägen vid frågor",
+      "Anmäler sig via tjänsten","Får bekräftelse inom bestämd tid",
+      "Får uppdateringar om eventet","Kan uppdatera sina kontaktuppgifter",
+      "Kan avboka sig från eventet","Följer arrangören"],
+    scenarios: [
+      {t:"Besökaren undrar om lokalen är tillgänglighetsanpassad och söker någon att fråga.",stop:3,o:"warn",
+       w:"Steget finns nu i flödet, så besökaren hittar en kontaktväg. Men det är inte bestämt vem som tar emot och svarar.",
+       p:"Steget är infört. Kvar är beslutet om vem som bemannar kontaktpunkten."},
+      {t:"Besökaren byter mejladress mellan anmälan och event.",stop:null,o:"pass",
+       w:"Flödet bär hela vägen. Besökaren uppdaterar uppgifterna i steg 7 och fortsätter få besked.",
+       p:"Bekräftar att det nya steget täcker luckan från Besökare 09 i v1."},
+      {t:"Eventet är fullbokat när besökaren tittar på det.",stop:2,o:"pass",
+       w:"Flödet stannar här, och det är avsikten. Steg 2 visar platstillgången, så besökaren anmäler sig aldrig till ett fullt event.",
+       p:"Bekräftar att ändringen i steg 2 täcker luckan från Besökare 08 i v1."},
+      {t:"Besökaren har anmält tre personer och en av dem hoppar av.",stop:8,o:"stop",
+       w:"Steg 4 tar emot flera personer och steg 8 hanterar avbokning, men det framgår inte om en av tre kan avbokas eller om hela anmälan måste göras om.",
+       p:"Nytt krav: delvis avbokning av en anmälan som omfattar flera personer."}
+    ]
+  },
+
+  arrangor_v2: {
+    name: "Arrangör", ver: "v2",
+    steps: ["Har behörighet att lämna in event","Kommer överens med artisten",
+      "Lämnar eventuppgifterna i en kanal","Får kvittens och vet svarstiden",
+      "Granskas av utpekad ansvarig","Godkänd uppgift blir gällande version",
+      "Får återkoppling när den publicerats","Ser den aktuella anmälningslistan",
+      "Kan nå de anmälda med information","Ändrar på ett ställe",
+      "Undantagsväg: flytta, ställ in eller dra tillbaka"],
+    scenarios: [
+      {t:"En ny medarbetare hos arrangören ska lämna in sitt första event.",stop:1,o:"warn",
+       w:"Steget finns nu, så det är klart att behörighet krävs och att den ska tilldelas. Men rutinen för hur den ges är inte beslutad.",
+       p:"Steget är infört. Kvar är beslutet om vem som tilldelar behörighet och hur."},
+      {t:"Arrangören behöver nå alla anmälda med information om parkering.",stop:null,o:"pass",
+       w:"Flödet bär. Steg 9 ger arrangören en väg till sina anmälda utan att Svensk Scen går in i relationen.",
+       p:"Bekräftar att det nya steget täcker luckan från Arrangör 16 i v1, och att arrangören behåller direktkontakten."},
+      {t:"Arrangören vill ändra beskrivningstexten, inte tiden.",stop:5,o:"warn",
+       w:"Steg 5 släpper igenom ändringar inom arrangörens egna ramar, men vilka ändringar som ryms i de ramarna är inte bestämt.",
+       p:"Flödet har vägen. Kvar är beslutet om vad arrangören får ändra utan godkännande."},
+      {t:"Event Admin godkände fel tid. Det upptäcks dagen efter.",stop:null,o:"pass",
+       w:"Flödet bär. Steg 6 går att rätta och rättelsen går samma väg ut, så anmälda får det korrigerade beskedet.",
+       p:"Bekräftar att ändringen i steg 6 täcker luckan från Svensk Scen 13 i v1."},
+      {t:"Artisten kan inte längre. Eventet flyttas två veckor fram.",stop:null,o:"pass",
+       w:"Flödet bär. Undantagsvägen flyttar eventet och tar med befintliga anmälningar till det nya datumet.",
+       p:"Bekräftar att grenen täcker luckan från Besökare 04 och Arrangör 02 i v1."},
+      {t:"Eventet måste ställas in helt.",stop:null,o:"pass",
+       w:"Flödet bär. Inställning är nu en egen väg med besked till anmälda, inte en ändring som saknar mottagare.",
+       p:"Bekräftar att grenen täcker luckan från Besökare 06 och Arrangör 03 i v1."},
+      {t:"Arrangören ångrar en förfrågan som ännu inte godkänts.",stop:null,o:"pass",
+       w:"Flödet bär. Förfrågan kan dras tillbaka innan den blir gällande version.",
+       p:"Bekräftar att grenen täcker luckan från Arrangör 20 i v1."}
+    ]
+  }
+};
+
+/* Hur ofta scenariot bedöms inträffa. Våra antaganden — ingen data finns. */
+const FREQ = {
+  besokare:["ofta","ibland","ofta","ofta","ofta","ibland","ofta","ibland","sallan",
+    "ibland","sallan","ibland","ibland","ibland","ibland","ibland","ofta","sallan",
+    "ibland","ofta"],
+  arrangor:["ofta","ibland","ibland","ibland","ibland","ibland","ofta","sallan",
+    "sallan","ofta","ibland","sallan","sallan","ibland","ibland","ofta","ibland",
+    "ofta","sallan","sallan"],
+  svenskscen:["ofta","ibland","ibland","ibland","ibland","sallan","sallan","ibland",
+    "ibland","ibland","sallan","sallan","ibland","ibland","ofta","ofta","sallan",
+    "sallan","sallan","ibland"],
+  besokare_v2:["ofta","sallan","ibland","ibland"],
+  arrangor_v2:["ibland","ofta","ofta","ibland","ibland","ibland","sallan"]
+};
+const FLABEL = {ofta:"Inträffar ofta", ibland:"Inträffar ibland", sallan:"Inträffar sällan"};
+const FW = {ofta:3, ibland:2, sallan:1};
+const OW = {stop:2, warn:1, pass:0};
+
+/* Frekvens × utfall ger kravets prioritet. */
+function prio(o, f){
+  if(o === "pass") return null;
+  if(o === "stop") return (f === "sallan") ? "should" : "must";
+  return (f === "ofta") ? "should" : "could";
+}
+const PLABEL = {must:"Must have", should:"Should have", could:"Could have"};
+
+const LABEL = {pass:"Bekräftelse", warn:"Otydlighet", stop:"Lucka"};
+const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+let cur = "besokare";
+let mode = "log";
+let ver = "v1";
+const S = {};
+Object.keys(FLOWS).forEach(k => S[k] = {done:[], last:null, shown:false});
+
+const keysOf = v => Object.keys(FLOWS).filter(k => (FLOWS[k].ver || "v1") === v);
+
+/* ---- lägesväljare ---- */
+const vsw = document.getElementById("vsw");
+[["v1","Flöden v1"],["v2","Flöden v2"]].forEach(([v,label])=>{
+  const b = document.createElement("button");
+  b.dataset.v = v;
+  b.textContent = label;
+  b.onclick = () => {
+    if(ver === v) return;
+    ver = v;
+    cur = keysOf(v)[0];
+    buildSeg();
+    paint();
+  };
+  vsw.appendChild(b);
+});
+
+/* ---- segmented control ---- */
+const seg = document.getElementById("seg");
+function buildSeg(){
+  seg.innerHTML = "";
+  keysOf(ver).forEach(k => {
+    const f = FLOWS[k];
+    const b = document.createElement("button");
+    b.dataset.k = k;
+    b.innerHTML = `${f.name} <em data-c="${k}">0/${f.scenarios.length}</em>`;
+    b.onclick = () => { cur = k; paint(); };
+    seg.appendChild(b);
+  });
+}
+buildSeg();
+
+function idOf(k,i){
+  const n = {besokare:"Besökare", arrangor:"Arrangör", svenskscen:"Svensk Scen",
+    besokare_v2:"Besökare v2", arrangor_v2:"Arrangör v2"}[k];
+  return n + " " + String(i+1).padStart(2,"0");
+}
+
+/* ---- draw ---- */
+function draw(){
+  const st = S[cur], f = FLOWS[cur];
+  const left = f.scenarios.map((_,i)=>i).filter(i=>!st.done.includes(i));
+  if(!left.length) return;
+  const pick = left[Math.floor(Math.random()*left.length)];
+  st.done.push(pick); st.last = pick; st.shown = false;
+  paint();
+}
+
+function show(){
+  const st = S[cur];
+  if(st.last === null || st.shown) return;
+  st.shown = true;
+  paint();
+  animate();
+}
+
+function animate(){
+  const rows = [...document.querySelectorAll(".rail li")];
+  const find = document.querySelector(".find");
+  if(reduced){
+    rows.forEach(r=>{r.classList.remove("q");r.classList.add("lit")});
+    if(find){find.classList.remove("q");find.classList.add("lit")}
+    return;
+  }
+  rows.forEach((r,i)=>setTimeout(()=>{
+    r.classList.remove("q"); r.classList.add("lit");
+  }, 70 + i*95));
+  if(find) setTimeout(()=>{
+    find.classList.remove("q"); find.classList.add("lit");
+  }, 120 + rows.length*95);
+}
+
+/* ---- render ---- */
+function cardHTML(k, idx, shown){
+  const f = FLOWS[k], s = f.scenarios[idx];
+  const stopAt = s.stop === null ? f.steps.length + 1 : s.stop;
+  let rail = "";
+  f.steps.forEach((txt,i)=>{
+    const n = i+1;
+    let cls = "q", tag = "";
+    if(n < stopAt) cls += " ok";
+    else if(n === stopAt){
+      cls += s.o === "pass" ? " ok" : (s.o === "warn" ? " halt-warn" : " halt-stop");
+      if(s.o !== "pass")
+        tag = `<span class="halt-label">${s.o==="warn"?"oklart här":"tar stopp här"}</span>`;
+    } else cls += " dead";
+    if(n >= stopAt && s.stop !== null) cls += " dashed";
+    rail += `<li class="${cls}"><span class="node"></span><span class="wire"></span>`
+         +  `<span class="num">${n}</span><span>${txt}</span>${tag}</li>`;
+  });
+
+  return `
+  <div class="card">
+    <div class="head">
+      <span class="id">${idOf(k,idx)}</span>
+      <span class="freq f-${FREQ[k][idx]}">${FLABEL[FREQ[k][idx]]}</span>
+      ${shown ? `<span class="chip ${s.o}">${LABEL[s.o]}</span>` : ``}
+    </div>
+    <p class="scen">${s.t}</p>
+    ${shown ? `
+      <ul class="rail">${rail}</ul>
+      <div class="find q">
+        <section><h3>Vad som hände</h3><p>${s.w}</p></section>
+        <section><h3>Pekar på</h3><p>${s.p}</p></section>
+      </div>
+    ` : `
+      <div class="prompt">
+        <button class="btn solid" onclick="show()">Visa utfall</button>
+        <span>Låt gruppen resonera först.</span>
+      </div>
+    `}
+  </div>`;
+}
+
+function paint(){
+  const st = S[cur], f = FLOWS[cur], total = f.scenarios.length;
+
+  [...vsw.children].forEach(b=>b.classList.toggle("on", b.dataset.v===ver));
+  [...seg.children].forEach(b=>b.classList.toggle("on", b.dataset.k===cur));
+  keysOf(ver).forEach(k=>{
+    const e = seg.querySelector(`em[data-c="${k}"]`);
+    if(e) e.textContent = S[k].done.length + "/" + FLOWS[k].scenarios.length;
+  });
+
+  const ticks = document.getElementById("ticks");
+  ticks.innerHTML = "";
+  for(let i=0;i<total;i++){
+    const d = document.createElement("span");
+    d.className = "tick";
+    const pos = st.done.indexOf(i);
+    if(pos > -1){
+      const o = f.scenarios[i].o;
+      d.classList.add(o);
+      d.style.color = `var(--${o})`;
+      if(i === st.last && st.shown) d.classList.add("now");
+    }
+    ticks.appendChild(d);
+  }
+
+  const act = document.getElementById("act");
+  const allRun = st.done.length >= total;
+  if(st.last !== null && !st.shown){ act.textContent = "Visa utfall"; act.disabled = false; }
+  else { act.textContent = allRun ? "Alla körda" : "Kör scenario"; act.disabled = allRun; }
+  document.getElementById("runall").disabled = allRun;
+  document.getElementById("logbtn").disabled = st.done.length === 0;
+
+  const stage = document.getElementById("stage");
+  stage.innerHTML = st.last === null
+    ? `<div class="card"><div class="empty">Välj flöde och kör ett scenario.</div></div>`
+    : cardHTML(cur, st.last, st.shown);
+}
+
+/* ---- controls ---- */
+document.getElementById("act").onclick = () => {
+  const st = S[cur];
+  if(st.last !== null && !st.shown) show(); else draw();
+};
+document.getElementById("start").onclick = () => {
+  if(S[cur].last === null) draw();
+  document.getElementById("stage").scrollIntoView({
+    behavior: reduced ? "auto" : "smooth", block:"center"});
+};
+document.getElementById("runall").onclick = () => {
+  const st = S[cur], f = FLOWS[cur];
+  f.scenarios.forEach((_,i)=>{ if(!st.done.includes(i)) st.done.push(i); });
+  st.last = st.done[st.done.length-1]; st.shown = true;
+  paint(); animate(); openLog();
+};
+document.getElementById("reset").onclick = () => {
+  S[cur] = {done:[], last:null, shown:false}; paint();
+};
+addEventListener("keydown", e=>{
+  if(document.getElementById("drawer").classList.contains("on")){
+    if(e.key === "Escape") closeLog();
+    return;
+  }
+  if(e.code === "Space" || e.key === "Enter"){
+    if(document.activeElement && document.activeElement.tagName === "BUTTON") return;
+    e.preventDefault();
+    const st = S[cur];
+    if(st.last !== null && !st.shown) show(); else draw();
+  }
+});
+
+/* ---- sammanställning ---- */
+function sumData(){
+  const flows = keysOf(ver).map(k=>{
+    const f = FLOWS[k], run = S[k].done;
+    const c = {pass:0,warn:0,stop:0};
+    let load = 0;
+    run.forEach(i=>{
+      const o = f.scenarios[i].o;
+      c[o]++;
+      load += FW[FREQ[k][i]] * OW[o];
+    });
+    return {k, name:f.name, total:f.scenarios.length, run:run.length, c, load};
+  });
+  const reqs = {must:[], should:[], could:[]};
+  keysOf(ver).forEach(k=>{
+    const f = FLOWS[k];
+    S[k].done.forEach(i=>{
+      const s = f.scenarios[i], p = prio(s.o, FREQ[k][i]);
+      if(p) reqs[p].push({id:idOf(k,i), text:s.p, freq:FREQ[k][i], o:s.o});
+    });
+  });
+  return {flows, reqs};
+}
+
+function openSummary(){
+  mode = "sum";
+  const {flows, reqs} = sumData();
+  const anyRun = flows.some(f=>f.run > 0);
+  document.getElementById("dtitle").textContent = "Sammanställning";
+
+  let html = `<p class="sum-note">Tyngd väger varje utfall mot hur ofta
+    scenariot bedöms inträffa (ofta 3, ibland 2, sällan 1 — gånger lucka 2 eller
+    otydlighet 1). Frekvenserna är våra antaganden, inte data om Svensk Scen.</p>`;
+
+  if(!anyRun){
+    html += `<p class="sum-note">Inget kört än. Kör scenarier så fylls
+      sammanställningen på.</p>`;
+  } else {
+    flows.forEach(f=>{
+      const tot = f.c.pass + f.c.warn + f.c.stop || 1;
+      html += `<div class="sum-flow">
+        <div class="sum-top">
+          <h3>${f.name}</h3>
+          <span class="run">${f.run} av ${f.total} körda</span>
+          <span class="load">Tyngd ${f.load}</span>
+        </div>
+        <div class="stack">
+          <i class="pass" style="width:${f.c.pass/tot*100}%"></i>
+          <i class="warn" style="width:${f.c.warn/tot*100}%"></i>
+          <i class="stop" style="width:${f.c.stop/tot*100}%"></i>
+        </div>
+        <div class="legend">
+          <span class="lp"><b>${f.c.pass}</b> bekräftelse</span>
+          <span class="lw"><b>${f.c.warn}</b> otydlighet</span>
+          <span class="ls"><b>${f.c.stop}</b> lucka</span>
+        </div>
+      </div>`;
+    });
+
+    const why = {
+      must:"Flödet tar slut på något som inträffar ofta eller ibland.",
+      should:"Tar slut på något sällsynt, eller är otydligt på något vanligt.",
+      could:"Otydligt på något som inträffar mer sällan."
+    };
+    ["must","should","could"].forEach(p=>{
+      if(!reqs[p].length) return;
+      html += `<div class="prio-h ${p}"><h3>${PLABEL[p]}</h3>
+        <span>${reqs[p].length} krav · ${why[p]}</span></div>`;
+      reqs[p].forEach(r=>{
+        html += `<div class="req ${p}"><p>${r.text}
+          <span class="src">${r.id} · ${FLABEL[r.freq].toLowerCase()}</span></p></div>`;
+      });
+    });
+  }
+
+  document.getElementById("dbody").innerHTML = html;
+  document.getElementById("drawer").classList.add("on");
+  document.getElementById("drawer").setAttribute("aria-hidden","false");
+  document.getElementById("scrim").classList.add("on");
+}
+
+function sumText(){
+  const {flows, reqs} = sumData();
+  let o = "Process-Simulator – sammanställning\n\n";
+  o += "Tyngd = frekvens (ofta 3, ibland 2, sällan 1) × utfall (lucka 2, otydlighet 1).\n";
+  o += "Frekvenserna är våra antaganden, inte data om Svensk Scen.\n\n";
+  flows.forEach(f=>{
+    o += f.name + " — " + f.run + " av " + f.total + " körda, tyngd " + f.load + "\n";
+    o += "  Bekräftelse " + f.c.pass + ", otydlighet " + f.c.warn + ", lucka " + f.c.stop + "\n\n";
+  });
+  ["must","should","could"].forEach(p=>{
+    if(!reqs[p].length) return;
+    o += "\n" + PLABEL[p] + " (" + reqs[p].length + ")\n";
+    reqs[p].forEach(r=>{ o += "  - " + r.text + "  [" + r.id + ", " + FLABEL[r.freq].toLowerCase() + "]\n"; });
+  });
+  return o;
+}
+
+/* ---- log ---- */
+function logText(){
+  const st = S[cur], f = FLOWS[cur];
+  let o = "Process-Simulator – " + f.name + "\n";
+  o += "Körda: " + st.done.length + " av " + f.scenarios.length + "\n\n";
+  st.done.forEach(i=>{
+    const s = f.scenarios[i];
+    o += idOf(cur,i) + " — " + LABEL[s.o] + ", " + FLABEL[FREQ[cur][i]].toLowerCase() + "\n";
+    o += "Scenario: " + s.t + "\n";
+    o += "Nådde: " + (s.stop===null ? "hela flödet" : "steg " + s.stop + " av " + f.steps.length) + "\n";
+    o += "Vad som hände: " + s.w + "\n";
+    o += "Pekar på: " + s.p + "\n\n";
+  });
+  return o;
+}
+function openLog(){
+  mode = "log";
+  const st = S[cur], f = FLOWS[cur];
+  document.getElementById("dtitle").textContent = "Logg – " + f.name;
+  document.getElementById("dbody").innerHTML = !st.done.length
+    ? "<p class='meta'>Inget kört än.</p>"
+    : st.done.map(i=>{
+        const s = f.scenarios[i];
+        return `<div class="row">
+          <div class="rowtop">
+            <span class="id">${idOf(cur,i)}</span>
+            <span class="freq f-${FREQ[cur][i]}">${FLABEL[FREQ[cur][i]]}</span>
+            <span class="chip ${s.o}">${LABEL[s.o]}</span>
+          </div>
+          <p class="scn">${s.t}</p>
+          <p class="meta">Nådde: ${s.stop===null?"hela flödet":"steg "+s.stop+" av "+f.steps.length}</p>
+          <p class="meta"><b>Vad som hände.</b> ${s.w}</p>
+          <p class="meta"><b>Pekar på.</b> ${s.p}</p>
+        </div>`;
+      }).join("");
+  document.getElementById("drawer").classList.add("on");
+  document.getElementById("drawer").setAttribute("aria-hidden","false");
+  document.getElementById("scrim").classList.add("on");
+}
+function closeLog(){
+  document.getElementById("drawer").classList.remove("on");
+  document.getElementById("drawer").setAttribute("aria-hidden","true");
+  document.getElementById("scrim").classList.remove("on");
+}
+document.getElementById("logbtn").onclick = openLog;
+document.getElementById("sumbtn").onclick = openSummary;
+document.getElementById("dclose").onclick = closeLog;
+document.getElementById("scrim").onclick = closeLog;
+const outText = () => mode === "sum" ? sumText() : logText();
+document.getElementById("copy").onclick = () => {
+  navigator.clipboard.writeText(outText()).then(()=>{
+    const b = document.getElementById("copy");
+    b.textContent = "Kopierat"; setTimeout(()=>b.textContent="Kopiera",1400);
+  });
+};
+document.getElementById("dl").onclick = () => {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([outText()],{type:"text/plain;charset=utf-8"}));
+  a.download = mode === "sum" ? "sammanstallning.txt" : "scenariotest-" + cur + ".txt";
+  a.click();
+};
+
+/* ---- ljuset som följer pekaren ---- */
+(function(){
+  const g = document.getElementById("glow");
+  if(!g || !matchMedia("(hover:hover)").matches) return;
+  let tx = innerWidth/2, ty = innerHeight/2, x = tx, y = ty, on = false, raf = 0;
+  const ease = reduced ? 1 : 0.14;
+  function tick(){
+    x += (tx - x) * ease;
+    y += (ty - y) * ease;
+    g.style.transform = `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, 0)`;
+    if(Math.abs(tx-x) > .4 || Math.abs(ty-y) > .4) raf = requestAnimationFrame(tick);
+    else raf = 0;
+  }
+  addEventListener("pointermove", e=>{
+    tx = e.clientX; ty = e.clientY;
+    if(!on){ on = true; g.classList.add("live"); g.style.transform =
+      `translate3d(${tx}px, ${ty}px, 0)`; x = tx; y = ty; }
+    if(!raf) raf = requestAnimationFrame(tick);
+  }, {passive:true});
+  addEventListener("pointerleave", ()=>{ on = false; g.classList.remove("live"); });
+  document.addEventListener("mouseleave", ()=>{ on = false; g.classList.remove("live"); });
+})();
+
+/* ---- sfären ---- */
+(function(){
+  const host = document.querySelector(".orb");
+  if(!host) return;
+  const cv = host.querySelector("canvas"), ctx = cv.getContext("2d");
+  let W=0, H=0, R=0;
+
+  function size(){
+    const dpr = Math.min(devicePixelRatio || 1, 2);
+    const r = host.getBoundingClientRect();
+    W = r.width || 330; H = r.height || 330;
+    cv.width = W*dpr; cv.height = H*dpr;
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    R = Math.min(W,H) * 0.42;
+  }
+
+  const N = 170, pts = [];
+  for(let i=0;i<N;i++){
+    const y = 1 - (i/(N-1))*2;
+    const rr = Math.sqrt(Math.max(0, 1-y*y));
+    const th = i * Math.PI * (3 - Math.sqrt(5));
+    pts.push({x:Math.cos(th)*rr, y:y, z:Math.sin(th)*rr,
+      ph: Math.random()*6.28, sp: .5 + Math.random()*1.1,
+      dr: (Math.random()-.5)*0.00018});
+  }
+
+  const rings = [];
+  [-0.88,-0.55,0,0.55,0.88].forEach(y=>{
+    const rr = Math.sqrt(Math.max(0,1-y*y)), seg=[];
+    for(let a=0;a<=56;a++){ const t=a/56*6.283;
+      seg.push({x:Math.cos(t)*rr, y:y, z:Math.sin(t)*rr}); }
+    rings.push(seg);
+  });
+  for(let m=0;m<6;m++){
+    const ro = m/6*Math.PI, seg=[];
+    for(let a=0;a<=56;a++){ const t=a/56*6.283;
+      const x=Math.cos(t);
+      seg.push({x:x*Math.cos(ro), y:Math.sin(t), z:x*Math.sin(ro)}); }
+    rings.push(seg);
+  }
+
+  const TILT = -0.28, ROLL = -0.38, FOC = 3.0;
+  const ct = Math.cos(TILT), st = Math.sin(TILT);
+  const cr = Math.cos(ROLL), sr = Math.sin(ROLL);
+  const SLOW = 0.00022, FAST = 0.00085;
+  let ay = 0.6, spd = SLOW, tgt = SLOW, t0 = 0, raf = 0;
+
+  host.addEventListener("pointerenter", ()=>{ tgt = FAST; host.classList.add("hot"); });
+  host.addEventListener("pointerleave", ()=>{ tgt = SLOW; host.classList.remove("hot"); });
+
+  function proj(p, c, s){
+    const x = p.x*c - p.z*s;
+    const z = p.x*s + p.z*c;
+    const y2 = p.y*ct - z*st;
+    const z2 = p.y*st + z*ct;
+    const xr = x*cr - y2*sr;
+    const yr = x*sr + y2*cr;
+    const k = FOC/(FOC - z2);
+    return {X: W/2 + xr*R*k, Y: H/2 - yr*R*k, Z: z2};
+  }
+
+  function draw(now){
+    const c = Math.cos(ay), s = Math.sin(ay);
+    ctx.clearRect(0,0,W,H);
+
+    ctx.beginPath();
+    ctx.arc(W/2, H/2, R*0.99, 0, 6.283);
+    ctx.fillStyle = "rgba(116,255,237,.04)";
+    ctx.fill();
+
+    ctx.lineWidth = 1;
+    for(const seg of rings){
+      let prev = null;
+      for(const p of seg){
+        const q = proj(p, c, s);
+        if(prev){
+          const a = 0.045 + 0.15*((q.Z+1)/2);
+          ctx.strokeStyle = "rgba(116,255,237," + a.toFixed(3) + ")";
+          ctx.beginPath();
+          ctx.moveTo(prev.X, prev.Y); ctx.lineTo(q.X, q.Y); ctx.stroke();
+        }
+        prev = q;
+      }
+    }
+
+    for(const p of pts){
+      const q = proj(p, c, s);
+      const d = (q.Z + 1) / 2;
+      const puls = 0.58 + 0.42*Math.sin(now*0.0009*p.sp + p.ph);
+      const a = (0.10 + 0.78*d*d) * puls;
+      ctx.beginPath();
+      ctx.arc(q.X, q.Y, 0.7 + 2.0*d, 0, 6.283);
+      ctx.fillStyle = "rgba(116,255,237," + a.toFixed(3) + ")";
+      ctx.fill();
+    }
+  }
+
+  function loop(now){
+    const dt = t0 ? Math.min(now - t0, 48) : 16;
+    t0 = now;
+    spd += (tgt - spd) * 0.05;
+    ay += spd * dt;
+    for(const p of pts){
+      const a = Math.atan2(p.z, p.x) + p.dr * dt * (spd/SLOW);
+      const rr = Math.hypot(p.x, p.z);
+      p.x = Math.cos(a)*rr; p.z = Math.sin(a)*rr;
+    }
+    draw(now);
+    raf = requestAnimationFrame(loop);
+  }
+
+  size();
+  addEventListener("resize", ()=>{ size(); if(reduced) draw(performance.now()); });
+  if(reduced) draw(performance.now());
+  else raf = requestAnimationFrame(loop);
+  document.addEventListener("visibilitychange", ()=>{
+    if(reduced) return;
+    if(document.hidden){ cancelAnimationFrame(raf); raf = 0; }
+    else if(!raf){ t0 = 0; raf = requestAnimationFrame(loop); }
+  });
+})();
+
+paint();
+</script>
+</body>
+</html>
